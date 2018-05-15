@@ -11,6 +11,7 @@ export default class SpotX {
 
         this.neighbors = [];
         this.previous = undefined;
+        this.previousX = undefined;
         
         this.type = 0;
 

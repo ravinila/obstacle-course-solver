@@ -11,7 +11,7 @@ export default class Game extends Component {
       cols: 10,
       rows: 10,
       diagonalAllowed: !false,
-      findShortestDistance: !false
+      findShortestDistance: !!false
     }
   };
 

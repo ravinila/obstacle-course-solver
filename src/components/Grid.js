@@ -12,13 +12,13 @@ export default class Grid extends Component {
     this.settings = this.props.settings;
     this.setupGrid();
     this.wormholeExits = [];
+    this.wormholeEntrances = [];
     this.w = this.settings.size.width / this.settings.cols;
     this.h = this.settings.size.height / this.settings.rows;
 
     this.state = {
       polylines: []
     }
-    
   }
 
   setupGrid() {
@@ -36,8 +36,8 @@ export default class Grid extends Component {
       for (var j = 0; j < this.settings.rows; j++) {
 
         this.gridX[i][j] = new SpotX({
-          i : i,
-          j : j,
+          i: i,
+          j: j,
           width: w,
           height: h,
           settings: this.settings,
@@ -55,49 +55,164 @@ export default class Grid extends Component {
 
   }
 
-  onSpotTypeChange(i, j, type){
+  onSpotTypeChange(i, j, type) {
     console.log('spot change', i, j, type)
     var spot = this.gridX[i][j];
     spot.type = type;
 
-    if(type === 4){
+    if (type === 4) {
       this.gridX[i][j].addNeighbors(this.gridX);
 
       if (!this.wormholeExits.includes(spot)) {
         this.wormholeExits.push(spot);
       }
+      removeFromArray(this.wormholeEntrances, spot);
     }
-    else{
-        removeFromArray(this.wormholeExits, spot);
+    else if(type === 3){
+
+      if (!this.wormholeEntrances.includes(spot)) {
+        this.wormholeEntrances.push(spot);
+      }
+      removeFromArray(this.wormholeExits, spot);
+    }
+    else {
+      removeFromArray(this.wormholeExits, spot);
+      removeFromArray(this.wormholeEntrances, spot);
     }
 
-    console.log("wormholeExits", this.wormholeExits)
+    console.log("wormholeEntrances", this.wormholeEntrances);
+    console.log("wormholeExits", this.wormholeExits);
+
+  }
+  findBestRoute(start, end){
+
+    var that = this;
+    start = start || this.gridX[0][0];
+    end = end || this.gridX[this.settings.cols - 1][this.settings.rows - 1];
+
+    var _currentRoute = this.findRoute(start, end);
+    var _currentRouteLen = findPathLength(_currentRoute);
+    
+    if(!_currentRoute){
+      /* NO ROUTE FOUND */
+      console.log("NO ROUTE FOUND");
+      return;
+    }
+
+    var _finalPaths = getPaths(_currentRoute);
+
+    console.log("_finalPaths", _finalPaths);
+
+    var fs = [];
+    if(this.wormholeEntrances.length && this.wormholeExits.length){
+      for(var i = 0; i < this.wormholeEntrances.length; i++){
+        let item = this.findRoute(this.gridX[0][0], this.wormholeEntrances[i]);
+
+        if( item ){
+          fs[i] = item;
+        }
+
+      }
+    }
+
+    console.log('fs', fs);
+    
+    if(fs.length){
+
+      fs = fs.sort((item1, item2) => item1.f - item2.f);
+
+      var entranceNode = fs[0];
+
+      console.log("entranceNode", entranceNode);
+
+      var _otherRoute = this.findRoute(entranceNode, end);
+
+      if(_otherRoute){
+        var _otherRouteLen = findPathLength(_otherRoute);
+
+        console.log("_currentRouteLen, _otherRouteLen", _currentRouteLen, _otherRouteLen);
+        // var pathsToEntrance = getPaths(entranceNode);
+
+        // console.log("pathsToEntrance", pathsToEntrance);
+
+        // for (var i = pathsToEntrance.length - 1; i > 0; i--) {
+        //   let path = pathsToEntrance[i];
+        //   // console.log("i", i)
+        //   path.h = heuristic(path, end);
+        //   path.f = path.g + path.h;
+        //   // path.previous = pathsToEntrance[i - 1];
+        // }
+
+        // var _otherRoute = this.findRoute(pathsToEntrance[pathsToEntrance.length - 1], end);
+
+        if(_otherRouteLen < _currentRouteLen){
+          _finalPaths = getPaths(_otherRoute);
+        }
+
+      }
+    }
+      
+    /* -------------- ----------------- */
+    this.drawPath(_finalPaths.reverse());
+
+    /* DONE */
+    function findPathLength(path){
+      
+      var len = 0, heu;
+      while (path.previous) {
+        var temp = path.previous;
+        heu = heuristic(path, temp) || 0;
+
+        if(temp.type === 3 && path.type === 4){
+          heu = 0;
+        }
+
+        if (!that.settings.findShortestDistance) {
+          if (temp.type === 2) {
+            heu += (heu / 2);
+          }
+          if (path.type === 2) {
+            heu += (heu / 2);
+          }
+        }
+
+        len += heu;
+
+        path  = temp;
+      }
+      return len;
+    }
+
+    function getPaths(temp){
+      var paths = [];
+      paths.push(temp);
+      while (temp.previous) {
+        paths.push(temp.previous);
+        temp = temp.previous;
+      }
+      return paths;
+    }
 
   }
 
-  findRoute(){
+  findRoute(start, end) {
 
     /* A* Algorithm based */
-    this.start = this.start || this.gridX[0][0];
-    this.end = this.end || this.gridX[this.settings.cols - 1][this.settings.rows - 1];
 
-    this.openSet = [];
-    this.closedSet = [];
-    this.openSet.push(this.start);
-
-    if (this.polyline) {
-      this.polyline.remove();
-    }
+    var openSet = [];
+    var closedSet = [];
+    openSet.push(start);
 
     /* Starts here */
-
+    var nearestWormholeExitHueristic;
     if (this.wormholeExits.length) {
-      var _nearHue = heuristic(this.wormholeExits[0], this.end);
+      var _nearHue = heuristic(this.wormholeExits[0], end);
+      if(this.wormholeExits.length > 1)
       for (var i = 1; i < this.wormholeExits.length; i++) {
-        var _hue = heuristic(this.wormholeExits[i], this.end);
+        var _hue = heuristic(this.wormholeExits[i], end);
         _nearHue = (_hue < _nearHue) ? _hue : _nearHue;
       }
-      var nearestWormholeExitHueristic = _nearHue;
+      nearestWormholeExitHueristic = _nearHue;
     }
 
     console.log('ravins');
@@ -105,23 +220,24 @@ export default class Grid extends Component {
 
     while (true) {
       length++;
-      if (this.openSet.length > 0) {
+      if (openSet.length > 0) {
 
         var winner = 0;
-        for (var i = 0; i < this.openSet.length; i++) {
-          if (this.openSet[i].f < this.openSet[winner].f) {
+        for (var i = 0; i < openSet.length; i++) {
+          if (openSet[i].f < openSet[winner].f) {
             winner = i;
           }
         }
-        var current = this.openSet[winner];
 
-        if (current === this.end) {
+        var current = openSet[winner];
+
+        if (current === end) {
           console.log("PATH FOUND!");
           break;
         }
 
-        removeFromArray(this.openSet, current);
-        this.closedSet.push(current);
+        removeFromArray(openSet, current);
+        closedSet.push(current);
 
         if (current.type === 3) {
           if (!this.wormholeExits.length) {
@@ -129,11 +245,12 @@ export default class Grid extends Component {
           }
           current.neighbors = this.wormholeExits;
         }
+        // console.log(current, "----")
 
         var neighbors = current.neighbors;
         for (var i = 0; i < neighbors.length; i++) {
           var neighbor = neighbors[i];
-          if (!this.closedSet.includes(neighbor) && neighbor.type !== 1) {
+          if (!closedSet.includes(neighbor) && neighbor.type !== 1) {
             if (neighbor.type === 4 && current.type !== 3) {
               continue;
             }
@@ -154,7 +271,7 @@ export default class Grid extends Component {
             var tempG = current.g + heuristicVal;
 
             var newPath = false;
-            if (this.openSet.includes(neighbor)) {
+            if (openSet.includes(neighbor)) {
               if (tempG < neighbor.g) {
                 neighbor.g = tempG;
                 newPath = true;
@@ -162,11 +279,11 @@ export default class Grid extends Component {
             } else {
               neighbor.g = tempG;
               newPath = true;
-              this.openSet.push(neighbor);
+              openSet.push(neighbor);
             }
 
             if (newPath) {
-              neighbor.h = heuristic(neighbor, this.end);
+              neighbor.h = heuristic(neighbor, end);
               if (neighbor.type === 3) {
                 neighbor.h = nearestWormholeExitHueristic;
               }
@@ -179,19 +296,20 @@ export default class Grid extends Component {
         // we can keep going
       } else {
         console.log('NO PATH FOUND!');
-        this.drawPath(false);
-        return;
+        // this.drawPath(false);
+        return false;
         // no solution
       }
     }
 
-    this.drawPath(current);
+    return current;
+    // this.drawPath(current);
   }
 
-  drawPath(current){
-    console.log("draw path")
+  drawPath(paths) {
+    console.log("draw paths-------------------");
 
-    if (current === false){
+    if (paths === false) {
       this.setState({
         polylines: []
       });
@@ -200,37 +318,66 @@ export default class Grid extends Component {
     // Find the path
     var w = this.w;
     var h = this.h;
-    
-    var path = [];
-    var temp = current;
-    path.push(temp);
-    while (temp.previous) {
-      path.push(temp.previous);
-      temp = temp.previous;
-    }
 
-    path = path.reverse();
-    console.log("total_distance", path)
+    // path = path.reverse();
+    // console.log("total_distance", paths)
 
     var polylines = [];
-    var arrPolyline1 = [];
-    for (var i = 0; i < path.length; i++) {
-      arrPolyline1.push([path[i].i/2 * w + w/4, path[i].j/2 * h + h/4 ].join(","));
+    var arrPolyline = [];
+    var temp;
+    for (var i = 0, j = 0; i < paths.length; i++) {
+      let item = paths[i];
+      let pointString = [item.i / 2 * w + w / 4, item.j / 2 * h + h / 4].join(",") + " ";
+
+      if (!polylines[j]) polylines[j] = { points: "", style: "" };
+
+      if (item.type === 3 || item.type === 4) {
+        polylines[j].points += pointString;
+        j++;
+        polylines[j] = { points: pointString, style: (item.type === 3 ? "2, 2" : "") };
+      }
+      else {
+        polylines[j].points += pointString;
+      }
+
+      // arrPolyline.push([path[i].i/2 * w + w/4, path[i].j/2 * h + h/4 ].join(",") + " ");
     }
 
-    console.log("path",path.find(function (item) { return item.type === 3 }))
-    console.log("path",path.find(function (item) { return item.type === 4 }))
+    // console.log("polylines", polylines.slice());
 
-    var index1 = path.indexOf(path.find(function (item) { return item.type === 3 }));
-    var index2 = path.indexOf(path.find(function (item) { return item.type === 4 }));
+    // var index1 = path.indexOf(path.find(function (item) { return item.type === 3 }));
+    // var index2 = path.indexOf(path.find(function (item) { return item.type === 4 }));
 
-    var arrPolyline2 = arrPolyline1.splice(index1, index2);
+    // console.log(arrPolyline, index1, index2);
 
-    polylines = [arrPolyline1.join(" "), arrPolyline2.join(" ")];
+    // if(index1 > -1 && index2 > -1){
 
-    // var polyline = draw.polyline().plot(arrPolyline).fill("none");
-    // polyline.stroke({ color: '#f06', width: 2, linecap: 'round', linejoin: 'round' });
+    //   var _arr = arrPolyline.slice(0, index1+1);
 
+    //   addPolyline(polylines, _arr);
+
+    //   _arr = arrPolyline.slice(index1 || (index1 ? index1 - 1 : 0), index2+1);
+
+    //   addPolyline(polylines, _arr, "2, 2");
+
+    //   _arr = arrPolyline.slice(index2);
+
+    //   addPolyline(polylines, _arr);
+    // }
+    // else{
+    //   addPolyline(polylines, arrPolyline);
+    // }
+
+    // function addPolyline(polylines, _arr, style) {
+    //   if(Array.isArray(polylines) && Array.isArray(_arr) && _arr.length){
+    //     polylines.push({
+    //       points: _arr.join(" "),
+    //       style: style || ""
+    //     });
+    //   }
+    // }
+
+    console.log("polylines", polylines);
     this.setState({
       polylines: polylines
     })
@@ -242,22 +389,16 @@ export default class Grid extends Component {
     for (var i = 0; i < this.settings.cols; i++) {
       for (var j = 0; j < this.settings.rows; j++) {
 
-        // console.log(i, j, this.gridX[i][j]);
-        // let item = this.gridX[i][j];
-        // let _x = {}, keys = Object.keys(item);
-        // for (var key in keys) {
-        //   _x[key] = item[key];
-        // }
         let type = this.gridX[i][j].type;
         this.grid[i][j] = (
           <Spot
             i={i}
             j={j}
-            type = {type}
+            type={type}
             onTypeChange={this.onSpotTypeChange.bind(this)}
             w={this.w}
             h={this.h}
-            key = {i + j} />
+            key={i + j} />
         );
 
       }
@@ -265,21 +406,25 @@ export default class Grid extends Component {
 
     const width = this.settings.size.width;
     const height = this.settings.size.height;
-    let viewBox = "0 0 " + (width/2) + " " + (height/2);
-    // viewBox = " 0 0 100 100";
+    let viewBox = "0 0 " + (width / 2) + " " + (height / 2);
 
     return (
       <div>
         <svg width={width} height={height} viewBox={viewBox} >
-        <g>
-        {this.grid}
-        {this.state.polylines.map(function (d, i) {
-          return <polyline points={d} key={i} fill="none" stroke="red" strokeWidth="1" />;
-        })}
-        </g>
-      </svg>
+          <g>
+            {this.grid}
+            {this.state.polylines.map(function (d, i) {
+              return (
+                <polyline points={d.points} key={i} fill="none" stroke="red"
+                  strokeWidth="1"
+                  strokeDasharray={d.style}
+                />
+              );
+            })}
+          </g>
+        </svg>
 
-      <button onClick={this.findRoute.bind(this)}> Find Route </button>
+        <button onClick={this.findBestRoute.bind(this, 0,0)}> Find Route </button>
       </div>
     );
   }
