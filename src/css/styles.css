@@ -1,0 +1,43 @@
+body{
+    /* background-color: orange; */
+}
+.grid-container{
+    width: 800px;
+    margin: auto;
+    border: 1px solid red;
+}
+.spotmaker-holder{
+    text-align: center;
+    margin: 30px 10px;;
+}
+.spotmaker{
+    width: 4rem;
+    height: 4rem;
+    margin: 5px;
+    display: inline-block;
+    background-size: 100% 100%;
+    background-color: white;
+}
+.spotmaker.active{
+    outline: lightskyblue 4px solid;
+}
+/* .spotmaker.boulder{
+    background-color: white;
+}
+.spotmaker.gravel{
+    background-color: white;
+}
+.spotmaker.wormhole-entrance{
+    background-color: #7fffc9;
+}
+.spotmaker.wormhole-exit{
+    background-color: #098e19;
+} 
+
+.spotmaker.start{
+    background-color: blue;
+}
+.spotmaker.end{
+    background-color: red;
+}
+*/

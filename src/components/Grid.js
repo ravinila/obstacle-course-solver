@@ -1,24 +1,30 @@
 import React, { Component } from "react";
 import Spot from "./Spot";
 import SpotX from "./SpotX";
-import { dist, removeFromArray, heuristic } from "./../common/utility";
+import {removeFromArray, heuristic } from "./../common/utility";
 
 export default class Grid extends Component {
   constructor(props) {
     super(props);
     console.log("Grid::", this.props);
     this.grid = this.props.grid;
-    this.gridX = [];
     this.settings = this.props.settings;
-    this.setupGrid();
     this.wormholeExits = [];
     this.wormholeEntrances = [];
     this.w = this.settings.size.width / this.settings.cols;
     this.h = this.settings.size.height / this.settings.rows;
 
+    this.start = false;
+    this.end = false;
+    
     this.state = {
-      polylines: []
+      polylines: [],
+      gridX: [],
+      activeSpotMaker: props.activeSpotMaker
     }
+console.log("this.state", this.state)
+    /*  */
+    this.setupGrid();
   }
 
   setupGrid() {
@@ -27,15 +33,15 @@ export default class Grid extends Component {
       h = this.settings.size.height / this.settings.rows;
 
     // Making 2D Array
-    for (var i = 0; i < this.settings.cols; i++) {
+    for (let i = 0; i < this.settings.cols; i++) {
       this.grid[i] = new Array(this.settings.rows);
-      this.gridX[i] = new Array(this.settings.rows);
+      this.state.gridX[i] = new Array(this.settings.rows);
     }
 
-    for (var i = 0; i < this.settings.cols; i++) {
-      for (var j = 0; j < this.settings.rows; j++) {
+    for (let i = 0; i < this.settings.cols; i++) {
+      for (let j = 0; j < this.settings.rows; j++) {
 
-        this.gridX[i][j] = new SpotX({
+        this.state.gridX[i][j] = new SpotX({
           i: i,
           j: j,
           width: w,
@@ -43,25 +49,63 @@ export default class Grid extends Component {
           settings: this.settings,
         });
 
-        // console.log("Keys", Object.keys(this.gridX[i][j]) )
+        // console.log("Keys", Object.keys(this.state.gridX[i][j]) )
       }
     }
 
-    for (var i = 0; i < this.settings.cols; i++) {
-      for (var j = 0; j < this.settings.rows; j++) {
-        this.gridX[i][j].addNeighbors(this.gridX);
+    for (let i = 0; i < this.settings.cols; i++) {
+      for (let j = 0; j < this.settings.rows; j++) {
+        this.state.gridX[i][j].addNeighbors(this.state.gridX);
+
       }
     }
+
+    this.start = this.state.gridX[0][0];
+    this.end = this.state.gridX[this.settings.cols - 1][this.settings.rows - 1];
+
+    this.start.type = 5;
+    this.end.type = 6;
 
   }
 
   onSpotTypeChange(i, j, type) {
-    console.log('spot change', i, j, type)
-    var spot = this.gridX[i][j];
+    // console.log('spot change', i, j, type);
+
+    console.log('type clicked', this.state.type, this.props.activeSpotMaker);
+    var type;
+
+    if (type === 5 || type === 6) return;
+
+    if (type === this.props.activeSpotMaker) return type;
+
+    if (this.props.activeSpotMaker === -1) {
+      type = type + 1;
+      if (type > 4) type = 0;
+    }
+    if(this.props.activeSpotMaker === 5){
+      console.log("this.start.type", this.start.type)
+      this.start.type = 0;
+      this.start = this.state.gridX[i][j];
+      this.start.type = 5;
+      type = 5;
+    }
+    if(this.props.activeSpotMaker === 6){
+      this.end.type = 0;
+      this.end = this.state.gridX[i][j];
+      this.end.type = 6;
+      type = 6;
+    }
+    else {
+      type = this.props.activeSpotMaker;
+    }
+
+    /* -------------- */
+
+    var spot = this.state.gridX[i][j];
     spot.type = type;
 
     if (type === 4) {
-      this.gridX[i][j].addNeighbors(this.gridX);
+      this.state.gridX[i][j].addNeighbors(this.state.gridX);
 
       if (!this.wormholeExits.includes(spot)) {
         this.wormholeExits.push(spot);
@@ -80,15 +124,24 @@ export default class Grid extends Component {
       removeFromArray(this.wormholeEntrances, spot);
     }
 
-    console.log("wormholeEntrances", this.wormholeEntrances);
-    console.log("wormholeExits", this.wormholeExits);
+    this.setState({
+      activeSpotMaker: type
+    });
 
+    this.findBestRoute(this.start, this.end, 0, 0)
+    // console.log("wormholeEntrances", this.wormholeEntrances);
+    // console.log("wormholeExits", this.wormholeExits);
+    return type;
   }
   findBestRoute(start, end){
+    console.log("findBestRoute", "prev", this.start.previous, this.end);
+    console.log("findBestRoute", "prev", this.start, start, this.end, end);
 
     var that = this;
-    start = start || this.gridX[0][0];
-    end = end || this.gridX[this.settings.cols - 1][this.settings.rows - 1];
+    start = this.start || start || this.state.gridX[0][0];
+    end = this.end || end || this.state.gridX[this.settings.cols - 1][this.settings.rows - 1];
+
+    start.previous = undefined;
 
     var _currentRoute = this.findRoute(start, end);
     var _currentRouteLen = findPathLength(_currentRoute);
@@ -96,9 +149,11 @@ export default class Grid extends Component {
     if(!_currentRoute){
       /* NO ROUTE FOUND */
       console.log("NO ROUTE FOUND");
+      this.drawPath(false);
       return;
     }
 
+    console.log('b4 getpaths');
     var _finalPaths = getPaths(_currentRoute);
 
     console.log("_finalPaths", _finalPaths);
@@ -106,7 +161,7 @@ export default class Grid extends Component {
     var fs = [];
     if(this.wormholeEntrances.length && this.wormholeExits.length){
       for(var i = 0; i < this.wormholeEntrances.length; i++){
-        let item = this.findRoute(this.gridX[0][0], this.wormholeEntrances[i]);
+        let item = this.findRoute(start, this.wormholeEntrances[i]);
 
         if( item ){
           fs[i] = item;
@@ -123,44 +178,68 @@ export default class Grid extends Component {
 
       var entranceNode = fs[0];
 
-      console.log("entranceNode", entranceNode);
+      var _otherClosedSets = getPaths(entranceNode);
 
-      var _otherRoute = this.findRoute(entranceNode, end);
+      console.log("entranceNode, _otherClosedSets", entranceNode, _otherClosedSets);
 
+      // var _otherRoute = this.findRoute(entranceNode, end);
+      var _otherRoute = this.findRoute(entranceNode, end, _otherClosedSets);
+
+      console.log("_otherRoute", _otherRoute);
       if(_otherRoute){
         var _otherRouteLen = findPathLength(_otherRoute);
 
         console.log("_currentRouteLen, _otherRouteLen", _currentRouteLen, _otherRouteLen);
         // var pathsToEntrance = getPaths(entranceNode);
 
-        // console.log("pathsToEntrance", pathsToEntrance);
-
-        // for (var i = pathsToEntrance.length - 1; i > 0; i--) {
-        //   let path = pathsToEntrance[i];
-        //   // console.log("i", i)
-        //   path.h = heuristic(path, end);
-        //   path.f = path.g + path.h;
-        //   // path.previous = pathsToEntrance[i - 1];
-        // }
-
-        // var _otherRoute = this.findRoute(pathsToEntrance[pathsToEntrance.length - 1], end);
-
-        if(_otherRouteLen < _currentRouteLen){
+        if(_otherRouteLen !== false && _otherRouteLen < _currentRouteLen){
           _finalPaths = getPaths(_otherRoute);
         }
 
+
+        /* Romove multiples of wormhole_entrance & wormhole_exit */
+        _finalPaths = removeDuplicateTypes(_finalPaths, 3);
+        _finalPaths = removeDuplicateTypes(_finalPaths.reverse(), 4);
+
       }
     }
-      
+    
     /* -------------- ----------------- */
-    this.drawPath(_finalPaths.reverse());
+    this.drawPath(_finalPaths);
 
     /* DONE */
+
+    function removeDuplicateTypes(list, type){
+      let firstIndex;
+
+      if(Array.isArray(list)){
+        for(let i = list.length - 1; i >= 0; i--){
+          let spot = list[i];
+          if(spot.type === type){
+            if(firstIndex){
+              list.splice(i, 1);
+            }
+            else{
+              firstIndex = true;
+            }
+          }
+        }
+      }
+
+      return list;
+    }
+
     function findPathLength(path){
       
-      var len = 0, heu;
+      var len = 0, heu, list = [];
       while (path.previous) {
         var temp = path.previous;
+        
+        if(list.includes(temp)){
+          return false;
+        }
+        list.push(temp);
+        
         heu = heuristic(path, temp) || 0;
 
         if(temp.type === 3 && path.type === 4){
@@ -186,7 +265,9 @@ export default class Grid extends Component {
     function getPaths(temp){
       var paths = [];
       paths.push(temp);
+      console.log(2);
       while (temp.previous) {
+        // if(temp)
         paths.push(temp.previous);
         temp = temp.previous;
       }
@@ -195,9 +276,10 @@ export default class Grid extends Component {
 
   }
 
-  findRoute(start, end) {
+  findRoute(start, end, otherClosedSet) {
 
     /* A* Algorithm based */
+    if(!otherClosedSet) otherClosedSet = [];
 
     var openSet = [];
     var closedSet = [];
@@ -216,14 +298,14 @@ export default class Grid extends Component {
     }
 
     console.log('ravins');
-    var length = 0;
+    // var length = 0;
 
     while (true) {
-      length++;
+      // length++;
       if (openSet.length > 0) {
 
         var winner = 0;
-        for (var i = 0; i < openSet.length; i++) {
+        for (let i = 0; i < openSet.length; i++) {
           if (openSet[i].f < openSet[winner].f) {
             winner = i;
           }
@@ -245,12 +327,12 @@ export default class Grid extends Component {
           }
           current.neighbors = this.wormholeExits;
         }
-        // console.log(current, "----")
+        console.log("1");
 
         var neighbors = current.neighbors;
-        for (var i = 0; i < neighbors.length; i++) {
+        for (let i = 0; i < neighbors.length; i++) {
           var neighbor = neighbors[i];
-          if (!closedSet.includes(neighbor) && neighbor.type !== 1) {
+          if (!closedSet.includes(neighbor) && !otherClosedSet.includes(neighbor) && neighbor.type !== 1) {
             if (neighbor.type === 4 && current.type !== 3) {
               continue;
             }
@@ -302,6 +384,8 @@ export default class Grid extends Component {
       }
     }
 
+    console.log("loop done!")
+
     return current;
     // this.drawPath(current);
   }
@@ -323,8 +407,7 @@ export default class Grid extends Component {
     // console.log("total_distance", paths)
 
     var polylines = [];
-    var arrPolyline = [];
-    var temp;
+    
     for (var i = 0, j = 0; i < paths.length; i++) {
       let item = paths[i];
       let pointString = [item.i / 2 * w + w / 4, item.j / 2 * h + h / 4].join(",") + " ";
@@ -384,46 +467,51 @@ export default class Grid extends Component {
   }
 
   render() {
+    // this.setState({
+    //   activeSpotMaker: this.props.activeSpotMaker
+    // })
 
     /* Add grid spots  */
-    for (var i = 0; i < this.settings.cols; i++) {
-      for (var j = 0; j < this.settings.rows; j++) {
+    this.grid = this.state.gridX.map((row, i) => {
+      return row.map( (item, j) => {
+        return (
 
-        let type = this.gridX[i][j].type;
-        this.grid[i][j] = (
-          <Spot
+            <Spot
             i={i}
             j={j}
-            type={type}
+            type={item.type}
             onTypeChange={this.onSpotTypeChange.bind(this)}
             w={this.w}
             h={this.h}
-            key={i + j} />
-        );
+            key={"ij" + i + "" + j}
+            activeSpotMaker={this.state.activeSpotMaker}
+            />
 
-      }
-    }
+        );
+      })
+    })
 
     const width = this.settings.size.width;
     const height = this.settings.size.height;
     let viewBox = "0 0 " + (width / 2) + " " + (height / 2);
 
     return (
-      <div>
-        <svg width={width} height={height} viewBox={viewBox} >
+      <div className="grid-container">
+        <svg width={width} height={height} viewBox={viewBox}>
           <g>
             {this.grid}
             {this.state.polylines.map(function (d, i) {
               return (
                 <polyline points={d.points} key={i} fill="none" stroke="red"
-                  strokeWidth="1"
+                  strokeWidth="2"
                   strokeDasharray={d.style}
                 />
               );
             })}
           </g>
         </svg>
-
+        <br/>
+        <br/>
         <button onClick={this.findBestRoute.bind(this, 0,0)}> Find Route </button>
       </div>
     );

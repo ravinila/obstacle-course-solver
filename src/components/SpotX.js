@@ -1,4 +1,3 @@
-import { dist, removeFromArray, heuristic} from "./../common/utility";
 
 export default class SpotX {
     constructor({i, j, width, height, settings}) {
@@ -15,9 +14,16 @@ export default class SpotX {
         
         this.type = 0;
 
-        if (Math.random(1) < 0.2) {
+        if (Math.random(1) < 0.4) {
             if (Math.random(1) < 0.5)
                 this.type = 1;
+                // if(Math.random(1) < 0.5)
+                //     this.type = 1;
+                // else
+                // if(Math.random(1) < 0.5)
+                //     this.type = 4;
+                // else
+                //     this.type = 3;
             else
                 this.type = 2;
         }
