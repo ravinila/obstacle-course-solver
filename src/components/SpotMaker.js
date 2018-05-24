@@ -25,7 +25,7 @@ export default class SpotMaker extends Component {
     }
 
     return (
-      <div style={styles} className={classes} onClick={this.selectSpotMaker.bind(this)}>
+      <div style={styles} className={classes} onClick={this.selectSpotMaker.bind(this)} title={this.spot.title}>
 
       </div>
     );

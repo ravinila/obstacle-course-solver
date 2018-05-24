@@ -2,9 +2,9 @@ body{
     /* background-color: orange; */
 }
 .grid-container{
-    width: 800px;
-    margin: auto;
-    border: 1px solid red;
+    width: 600px;
+    margin: 0 auto;
+    /* border: 1px solid red; */
 }
 .spotmaker-holder{
     text-align: center;

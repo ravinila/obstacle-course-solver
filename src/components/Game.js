@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import Settings from "./Settings";
 import Grid from "./Grid";
 import SpotMaker from "./SpotMaker";
 import {GameContext} from "./../common/context"
@@ -14,7 +15,7 @@ export default class Game extends Component {
       },
       cols: 15,
       rows: 15,
-      diagonalAllowed: !false,
+      diagonalPathAllowed: !false,
       findShortestDistance: !!false
     }
   };
@@ -32,11 +33,16 @@ export default class Game extends Component {
       { type: 6, title: "End", isActive: false, className: "end", color: "red", src: "/images/end.png" }
     ];
 
+    this.gridChild = React.createRef();
+
+
+    var settings = this.props.settings;
+
     this.state = {
-      activeSpotMaker: -1
+      activeSpotMaker: -1,
+      findShortestDistance: settings.findShortestDistance
     }
   }
-
 
   _handleKeyDown(event) {
     switch (event.keyCode) {
@@ -56,13 +62,6 @@ export default class Game extends Component {
       window.___reactMouseDown = true;
     }
   }
-  _handleMouseUp(event) {
-    console.log(event)
-    
-    if (event.which === 1) {
-      window.___reactMouseDown = false;
-    }
-  }
 
   componentWillMount() {
     document.addEventListener("keydown", this._handleKeyDown.bind(this));
@@ -76,6 +75,12 @@ export default class Game extends Component {
     // document.removeEventListener("mouseup", this._handleMouseUp.bind(this));
   }
 
+  updateScore(score){
+    this.setState({
+      score: score
+    })
+  }
+
   selectSpotMaker(e, type){
     this.setState({
       activeSpotMaker: type
@@ -87,21 +92,33 @@ export default class Game extends Component {
     let spotObject = this.spots[this.state.activeSpotMaker];
     let styles = {}
     if(spotObject){
-      // styles.cursor = "url(" + spotObject.src + "), auto";
       styles.userSelect = "none";
     }
 
     return (
       <div style={styles} className={this.state.activeSpotMaker}>
-        <div>This is Header</div>
+        <h2>Path finder with obstacles</h2>
+        <div>
+          Please select any of the obstacle and place it on the grid.<br />
+          <small>
+            If no obstacle is selected, just click on the grid to toggle between obstacles<br />
+            (Press ESC to cancel the selection)
+          </small>
+        </div>
         <div className="spotmaker-holder">
         {
           this.spots.map(item => <SpotMaker spot={item} activeSpot={this.state.activeSpotMaker} onSpotMakerSelect={this.selectSpotMaker.bind(this)} key={item.type}/>)
         }
         </div>
         <Grid
-          grid={this.grid} {...this.props} activeSpotMaker={this.state.activeSpotMaker}
+          ref={this.gridChild}
+          grid={this.grid}
+          {...this.props}
+          activeSpotMaker={this.state.activeSpotMaker}
+          findShortestDistance={this.state.findShortestDistance}
+          onScoreUpdate={this.updateScore.bind(this)}
         />
+        
       </div>
     );
   }

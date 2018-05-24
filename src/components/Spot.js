@@ -6,7 +6,7 @@ export default class Spot extends Component {
     super(props);
     this.props = props;
 
-    console.log("Spot::", this.props, this.props.activeSpotMaker);
+    // console.log("Spot::", this.props, this.props.activeSpotMaker);
     this.state = {
       type: this.props.type
     };
@@ -31,7 +31,7 @@ export default class Spot extends Component {
     // });
 
   }
-
+  /*
   applySpotTypeChange(){
     console.log('111', this.props.activeSpotMaker)
     if (window.___reactMouseDown && this.state.activeSpotMaker !== this.state.type){
@@ -39,7 +39,8 @@ export default class Spot extends Component {
         console.log('activeSpotMaker', this.state.activeSpotMaker)
       }
     }
-  }
+  } */
+  
   static getDerivedStateFromProps(nextProps, prevState){
     // console.log("XX", nextProps, prevState)
     return nextProps;
@@ -68,7 +69,6 @@ export default class Spot extends Component {
         y={this.props.j/2 * this.props.h}
         title={title}
         xlinkHref={src}
-      
         onClick={this.changeType.bind(this)}
         // onMouseMoveCapture={this.applySpotTypeChange.bind(this)}
         // onMouseMove={this.applySpotTypeChange.bind(this)}

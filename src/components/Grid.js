@@ -6,7 +6,7 @@ import {removeFromArray, heuristic } from "./../common/utility";
 export default class Grid extends Component {
   constructor(props) {
     super(props);
-    console.log("Grid::", this.props);
+
     this.grid = this.props.grid;
     this.settings = this.props.settings;
     this.wormholeExits = [];
@@ -16,13 +16,14 @@ export default class Grid extends Component {
 
     this.start = false;
     this.end = false;
-    
+
     this.state = {
       polylines: [],
       gridX: [],
-      activeSpotMaker: props.activeSpotMaker
+      activeSpotMaker: props.activeSpotMaker,
+      findShortestDistance: props.findShortestDistance
     }
-console.log("this.state", this.state)
+
     /*  */
     this.setupGrid();
   }
@@ -66,13 +67,23 @@ console.log("this.state", this.state)
     this.start.type = 5;
     this.end.type = 6;
 
+
+  }
+
+  componentDidMount(){
+    this.findBestRoute();
+    this.setState({});
+  }
+  componentDidUpdate(){
+    this.findBestRoute();
+    // this.setState({});
   }
 
   onSpotTypeChange(i, j, type) {
     // console.log('spot change', i, j, type);
 
-    console.log('type clicked', this.state.type, this.props.activeSpotMaker);
-    var type;
+    console.log('type clicked', this.state.type, type, this.props.activeSpotMaker);
+    // var type;
 
     if (type === 5 || type === 6) return;
 
@@ -82,14 +93,14 @@ console.log("this.state", this.state)
       type = type + 1;
       if (type > 4) type = 0;
     }
-    if(this.props.activeSpotMaker === 5){
-      console.log("this.start.type", this.start.type)
+    else if(this.props.activeSpotMaker === 5){
+      // console.log("this.start.type", this.start.type)
       this.start.type = 0;
       this.start = this.state.gridX[i][j];
       this.start.type = 5;
       type = 5;
     }
-    if(this.props.activeSpotMaker === 6){
+    else if(this.props.activeSpotMaker === 6){
       this.end.type = 0;
       this.end = this.state.gridX[i][j];
       this.end.type = 6;
@@ -128,14 +139,16 @@ console.log("this.state", this.state)
       activeSpotMaker: type
     });
 
-    this.findBestRoute(this.start, this.end, 0, 0)
+    this.findBestRoute(this.start, this.end, 0, 0);
     // console.log("wormholeEntrances", this.wormholeEntrances);
     // console.log("wormholeExits", this.wormholeExits);
     return type;
   }
   findBestRoute(start, end){
-    console.log("findBestRoute", "prev", this.start.previous, this.end);
-    console.log("findBestRoute", "prev", this.start, start, this.end, end);
+
+    // console.log("findBestRoute", "prev", this.start.previous, this.end);
+    // console.log("findBestRoute", "prev", this.start, start, this.end, end);
+    // console.log("this.findShortestDistance", this.props.findShortestDistance)
 
     var that = this;
     start = this.start || start || this.state.gridX[0][0];
@@ -145,10 +158,12 @@ console.log("this.state", this.state)
 
     var _currentRoute = this.findRoute(start, end);
     var _currentRouteLen = findPathLength(_currentRoute);
-    
+
     if(!_currentRoute){
       /* NO ROUTE FOUND */
       console.log("NO ROUTE FOUND");
+      this.score = false;
+
       this.drawPath(false);
       return;
     }
@@ -196,18 +211,61 @@ console.log("this.state", this.state)
           _finalPaths = getPaths(_otherRoute);
         }
 
-
         /* Romove multiples of wormhole_entrance & wormhole_exit */
         _finalPaths = removeDuplicateTypes(_finalPaths, 3);
         _finalPaths = removeDuplicateTypes(_finalPaths.reverse(), 4);
 
       }
     }
-    
+
     /* -------------- ----------------- */
+
+
+    this.score = getScore(_finalPaths);
     this.drawPath(_finalPaths);
 
     /* DONE */
+
+    function getScore(paths){
+
+      paths = paths || [];
+
+      return paths.reduce(function(agg, current, index, arr){
+        let next = arr[index + 1], len, time;
+        if(next){
+
+          len = heuristic(current, next) || 0;
+
+          if (current.type === 3 && next.type === 4) {
+            len = 0;
+          }
+          time = len;
+
+          if (!that.state.findShortestDistance) {
+            if (current.type === 2) {
+              len += (len / 2);
+            }
+            if (next.type === 2) {
+              len += (len / 2);
+            }
+          }
+
+          if (current.type === 2) {
+            time += (time / 2);
+          }
+          if (next.type === 2) {
+            time += (time / 2);
+          }
+
+          agg.distance += len;
+          agg.time += time;
+        }
+
+        return agg;
+
+      }, {distance: 0, time: 0});
+
+    }
 
     function removeDuplicateTypes(list, type){
       let firstIndex;
@@ -230,23 +288,23 @@ console.log("this.state", this.state)
     }
 
     function findPathLength(path){
-      
-      var len = 0, heu, list = [];
+
+      var len = 0, time = 0, heu, list = [];
       while (path.previous) {
         var temp = path.previous;
-        
+
         if(list.includes(temp)){
           return false;
         }
         list.push(temp);
-        
-        heu = heuristic(path, temp) || 0;
 
+        heu = heuristic(path, temp) || 0;
+        
         if(temp.type === 3 && path.type === 4){
           heu = 0;
         }
 
-        if (!that.settings.findShortestDistance) {
+        if (!that.state.findShortestDistance) {
           if (temp.type === 2) {
             heu += (heu / 2);
           }
@@ -327,7 +385,7 @@ console.log("this.state", this.state)
           }
           current.neighbors = this.wormholeExits;
         }
-        console.log("1");
+        // console.log("1", this.props.findShortestDistance);
 
         var neighbors = current.neighbors;
         for (let i = 0; i < neighbors.length; i++) {
@@ -340,7 +398,7 @@ console.log("this.state", this.state)
             if (current.type !== 3) {
               heuristicVal = heuristic(neighbor, current);
 
-              if (!this.settings.findShortestDistance) {
+              if (!this.state.findShortestDistance) {
                 if (neighbor.type === 2) {
                   heuristicVal += (heuristicVal / 2);
                 }
@@ -394,9 +452,10 @@ console.log("this.state", this.state)
     console.log("draw paths-------------------");
 
     if (paths === false) {
-      this.setState({
-        polylines: []
-      });
+      this.state.polylines = []
+      // this.setState({
+      //   polylines: []
+      // });
       return;
     }
     // Find the path
@@ -417,60 +476,38 @@ console.log("this.state", this.state)
       if (item.type === 3 || item.type === 4) {
         polylines[j].points += pointString;
         j++;
-        polylines[j] = { points: pointString, style: (item.type === 3 ? "2, 2" : "") };
+        polylines[j] = { points: pointString, style: (item.type === 3 ? "4, 4" : "") };
       }
       else {
         polylines[j].points += pointString;
       }
 
-      // arrPolyline.push([path[i].i/2 * w + w/4, path[i].j/2 * h + h/4 ].join(",") + " ");
     }
 
-    // console.log("polylines", polylines.slice());
-
-    // var index1 = path.indexOf(path.find(function (item) { return item.type === 3 }));
-    // var index2 = path.indexOf(path.find(function (item) { return item.type === 4 }));
-
-    // console.log(arrPolyline, index1, index2);
-
-    // if(index1 > -1 && index2 > -1){
-
-    //   var _arr = arrPolyline.slice(0, index1+1);
-
-    //   addPolyline(polylines, _arr);
-
-    //   _arr = arrPolyline.slice(index1 || (index1 ? index1 - 1 : 0), index2+1);
-
-    //   addPolyline(polylines, _arr, "2, 2");
-
-    //   _arr = arrPolyline.slice(index2);
-
-    //   addPolyline(polylines, _arr);
-    // }
-    // else{
-    //   addPolyline(polylines, arrPolyline);
-    // }
-
-    // function addPolyline(polylines, _arr, style) {
-    //   if(Array.isArray(polylines) && Array.isArray(_arr) && _arr.length){
-    //     polylines.push({
-    //       points: _arr.join(" "),
-    //       style: style || ""
-    //     });
-    //   }
-    // }
-
     console.log("polylines", polylines);
+    this.state.polylines = polylines;
+
+    // this.setState({
+    //   polylines: polylines
+    // });
+  }
+
+  updateSettings(){
+    this.state.findShortestDistance = this.refs.shortest.checked;
+    this.findBestRoute();
     this.setState({
-      polylines: polylines
+      findShortestDistance: this.state.findShortestDistance
     })
   }
 
-  render() {
-    // this.setState({
-    //   activeSpotMaker: this.props.activeSpotMaker
-    // })
+  static getDerivedStateFromProps(nextProps, prevState) {
+    // console.log('getDerivedStateFromProps', nextProps, prevState);
+    return nextProps;
+  }
 
+
+  render() {
+    // console.log("Grid::render()")
     /* Add grid spots  */
     this.grid = this.state.gridX.map((row, i) => {
       return row.map( (item, j) => {
@@ -502,17 +539,58 @@ console.log("this.state", this.state)
             {this.grid}
             {this.state.polylines.map(function (d, i) {
               return (
-                <polyline points={d.points} key={i} fill="none" stroke="red"
-                  strokeWidth="2"
+                <g key={i}>
+                {
+                //     <polyline points={d.points} key={i} fill="none" stroke="#c6edff"
+                //   strokeWidth="2"
+                //   strokeLinecap="round"
+                //   strokeLinejoin="round"
+                //   strokeDasharray={d.style}
+                // />
+                }
+                <polyline points={d.points} fill="none" stroke="red"
+                // <polyline points={d.points} key={i} fill="none" stroke="#00b3fd"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   strokeDasharray={d.style}
                 />
+                </g>
               );
             })}
           </g>
         </svg>
         <br/>
         <br/>
-        <button onClick={this.findBestRoute.bind(this, 0,0)}> Find Route </button>
+
+        <div>
+          {
+            !this.score &&
+            <div>
+              <span style={{ display: "inline-block", padding: "10px", color: "red" }}>NO ROUTE FOUND</span>
+            </div>
+          }
+
+          {
+            this.score &&
+            <div>
+              <span style={{ display: "inline-block", padding: "10px" }}>Time: {this.score.time && (this.score.time).toFixed(1)}</span>
+              <span style={{ display: "inline-block", padding: "10px" }}>Distance: {this.score.distance && (this.score.distance).toFixed(1)}</span>
+            </div>
+          }
+
+
+        </div>
+        <input type="checkbox" ref="shortest" id="shortest" defaultChecked={this.props.findShortestDistance} onClick={this.updateSettings.bind(this)} /> <label for="shortest">Find shortest route by distance</label>
+
+        {
+          // <button onClick={this.findBestRoute.bind(this, 0,0)}> Find Route </button>
+        }
+
+        <br />
+        <br />
+        <br />
+        <div>&nbsp;</div>
       </div>
     );
   }

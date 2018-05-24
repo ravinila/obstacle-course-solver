@@ -40,7 +40,7 @@ export default class SpotX {
 
         this.settings = settings;
 
-        console.log("SpotX::", this);
+        // console.log("SpotX::", this);
     }
     addNeighbors (grid) {
         this.neighbors = [];
@@ -58,7 +58,7 @@ export default class SpotX {
         if (j > 0) {
             this.neighbors.push(grid[i][j - 1]);
         }
-        if (this.settings.diagonalAllowed) {
+        if (this.settings.diagonalPathAllowed) {
             if (i > 0 && j > 0) {
                 this.neighbors.push(grid[i - 1][j - 1]);
             }
